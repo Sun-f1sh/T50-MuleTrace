@@ -1,80 +1,151 @@
 # MuleTrace
 
-MuleTrace is a local-first fraud triage application: CSV ingestion, source-aware schema mapping, transparent rules and ML-assisted scores, human review, and SHA-256 audit commitments with an optional EVM anchor. It preserves the supplied Next.js dashboard, Urbanist type, Celery and Fluorescent Mint visual system.
+**Local-first fraud triage and investigation workspace**
+
+MuleTrace helps analysts import transaction data, surface suspicious activity, investigate alerts, document human decisions, and verify an audit trail. It combines source-aware CSV ingestion, transparent rules, ML-assisted signals, cross-source candidate matching, and SHA-256 audit commitments.
+
+> **Prototype status:** MuleTrace is a research/demo prototype, not a production fraud-decision system. Scores are triage signals—not proof of fraud. Human review is required. No live blockchain deployment or real-world performance evaluation is included by default.
+
+## What it does
+
+- **Import:** Upload CSV files and map supported source schemas while preserving provenance and file hashes.
+- **Detect:** Combine transparent batch rules with supervised or anomaly-based model signals when the data supports them.
+- **Investigate:** Review alerts, inspect available evidence, and record analyst decisions.
+- **Connect:** Surface potential cross-source links using keyed HMAC-SHA-256 fingerprints; matches are candidates, not identity assertions.
+- **Audit:** Create SHA-256 commitments for run manifests and decisions, with optional testnet anchoring.
+- **Admin:** Inspect dashboard metrics, model/detection information, and operational activity available in the prototype.
 
 ## Architecture
 
-- `src/`: Next.js 15 frontend. Existing case, graph, timeline, alert, decision and audit components remain in place.
-- `src/app/backend/[...path]/route.ts`: same-origin server proxy. Browser traffic goes to `/backend/api/...`; backend secrets are not bundled in the browser.
-- `backend/main.py`: FastAPI API, SQLite (WAL, foreign keys, owner-only database/sidecar permissions), CSV pipelines, deduplication, feature extraction, model evaluation/versioning and audit verification.
-- `muletrace-contracts/contracts/MuleTraceAudit.sol`: `MuleTraceAuditRegistry`, owner-managed auditor authorization, separate append-only audit/model-version commitment methods. Only 32-byte SHA-256 commitments go on-chain.
+| Path | Responsibility |
+|---|---|
+| `frontend/` | Next.js 15 / React dashboard and same-origin backend proxy |
+| `frontend/src/app/(app)/` | Application routes, including alerts, investigations, audit, and admin |
+| `backend/main.py` | FastAPI API, SQLite storage, ingestion, feature extraction, scoring, and audit logic |
+| `backend/tests/` | Backend integration tests using temporary databases and synthetic fixtures |
+| `muletrace-contracts/` | Solidity audit registry and Hardhat tests for optional EVM anchoring |
 
-## Run locally
+## Quick start
+
+You need Python 3.10+ (use a version compatible with the pinned backend dependencies), Node.js/npm, and a terminal. Run the backend and frontend in separate terminals.
+
+### 1. Start the backend
 
 ```bash
 cd backend
-python3 -m venv .venv && . .venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8000
+uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-In another terminal:
+The API listens locally on `http://127.0.0.1:8000`.
+
+### 2. Start the frontend
+
+From the repository root, open a second terminal:
 
 ```bash
+cd frontend
 npm ci
 npm run dev
 ```
 
-The frontend's same-origin proxy defaults to `http://127.0.0.1:8000`. Override `MULETRACE_BACKEND_URL` on the Next.js server if the API is elsewhere. Backend state is in `backend/muletrace.sqlite3`; set `MULETRACE_DB` to move it. `npm run build` and `npm run typecheck` validate the frontend.
+Open the local URL printed by Next.js (typically `http://localhost:3000`). The frontend proxy defaults to `http://127.0.0.1:8000`.
 
-## Dataset integration and data integrity
+If your API runs elsewhere, set `MULETRACE_BACKEND_URL` in the **Next.js server environment** before starting the frontend. Do not use a `NEXT_PUBLIC_` variable for secrets.
 
-The dataset manager offers independent profiles for the three requested Kaggle sources. Download each CSV using your Kaggle account and upload it; this repository does not contain the datasets, Kaggle credentials, or a fabricated download. Uploads retain source URL, original headers, file SHA-256, uploader, row hashes, import counts, and source profile. Cross-source candidates compare keyed HMAC-SHA-256 identifier fingerprints only; matches are explicitly potential collisions, not identity assertions. The endpoint never returns raw IDs. In development the fingerprint key is generated next to the SQLite file with owner-only permissions; in production set and back up `MULETRACE_FINGERPRINT_SECRET` in a secret manager before imports. Exact repeated rows already ingested under a source profile are skipped. Amount is required. Missing IDs, timestamps, counterparties, labels, and currencies remain absent; they are not invented. Unknown-currency amounts remain labeled as units; mixed currencies are not silently summed. PaySim step is shown as a relative step, not converted to a calendar date. Non-UTF-8, malformed, over-limit and unrecognized files fail with an API error.
+## Demo workflow
 
-- **Eedala / PaySim:** recognizes `step`, `type`, `amount`, `nameOrig`, `nameDest`, `isFraud`. Balance-before/after and `isFlaggedFraud` are excluded from predictive features due to leakage/label-adjacent concerns documented by the source.
-- **Thuandao:** independent aliases for common transaction/account/amount/date/fraud headers. The public dataset page did not provide a complete schema in this implementation environment; only actual headers are mapped and unknown columns are not assumed.
-- **Yogesh Tekawade:** recognizes transaction, customer, amount, account/investment type and date headers. Its documented transaction schema does not contain a fraud label, so that profile remains unsupervised unless an uploaded CSV actually contains a label field.
+1. Open the dataset/import area and upload a supported CSV.
+2. Confirm the detected source profile and mapped fields; review import results.
+3. Open the generated alerts and inspect the available features and explanations.
+4. Open an investigation, review evidence, and record a human decision.
+5. Visit the audit view to inspect the commitment and its verification status.
+6. If demonstrating cross-source intelligence, import two datasets and present matches as *potential links* requiring analyst review.
 
-The current CSV API has configurable size and row caps (`MULETRACE_MAX_UPLOAD_BYTES`, default 200 MiB; `MULETRACE_MAX_ROWS`, default 250,000). Kaggle’s PaySim file can exceed this limit; use a filtered/partitioned CSV for this prototype or increase limits only after provisioning adequate memory and disk. Customer/business/bank side tables need pre-join in an approved analytical pipeline; the single-file uploader does not fabricate joins.
+Use synthetic or approved demo data. Do not upload real customer/bank data into an unapproved environment.
 
-## Models, evaluation and versioning
+## Dataset support and data handling
 
-Labeled batches with at least 20 usable rows and both label classes train/evaluate a class-balanced Random Forest with stratified out-of-fold predictions. The analytics API reports precision, recall, F1, PR-AUC, ROC-AUC and confusion matrix only when evaluation is applicable; unlabeled/low-count imports remain unevaluated. Amount-derived features/rules are normalized per observed currency. Scores combine Random Forest probability or IsolationForest anomaly percentile with transparent batch rules such as robust amount outliers and observed fan-in/fan-out. Supervised case explanations use held-out leave-one-feature-out perturbations; anomaly explanations show feature-deviation context and are explicitly non-causal. Explanations are capped to the 200 highest-risk rows per import by default (`MULETRACE_MAX_ATTRIBUTIONS`). Predictions remain predictions; only a human decision changes an investigation to `confirmed` or `cleared`.
+The dataset manager includes profiles for three external Kaggle sources: Eedala/PaySim, Thuandao, and Yogesh Tekawade. The datasets are **not bundled**; obtain them through the appropriate source and check their licenses and terms before use.
 
-Every import receives a version ID and SHA-256 commitment to a canonical run manifest (source-file hash, mapped schema, feature names, library versions, model configuration and estimator-artifact hash/status). Trained scikit-learn estimator bundles are saved off API/off-chain under an owner-only directory (default beside the SQLite database, override with `MULETRACE_MODEL_DIR`), mode `0700` directory/`0600` files. The per-artifact limit defaults to 50 MiB (`MULETRACE_MAX_MODEL_ARTIFACT_BYTES`); if persistence fails or exceeds the cap, the run still records an honest manifest with the artifact status, but does not claim an artifact hash. Artifact files are ignored from Git and never served by an API route. Configure encrypted host storage and managed key protection before production.
+- PaySim mapping recognizes fields such as `step`, `type`, `amount`, `nameOrig`, `nameDest`, and `isFraud`. Balance-before/after and `isFlaggedFraud` are excluded from predictive features because of leakage/label-adjacent concerns.
+- Thuandao mapping uses known aliases for common transaction/account/amount/date/fraud fields. Only present headers are mapped; unknown fields are not assumed.
+- Yogesh Tekawade mapping recognizes transaction/customer/amount/account/investment/date fields. If no fraud label is present, that import is treated as unlabeled.
 
-## Blockchain and audit
+The uploader requires an amount field. Missing IDs, timestamps, counterparties, labels, and currencies are not fabricated. Unknown-currency amounts remain in their original units, and mixed currencies are not silently summed. PaySim `step` is treated as a relative step, not a calendar timestamp. Exact repeated rows within a source profile are skipped.
 
-Decision payloads are canonicalized using sorted JSON and SHA-256 hashed. Raw transaction/customer evidence and model artifacts stay off-chain. The optional Web3 client broadcasts an investigation digest or separately typed model-version digest only when `MULETRACE_EVM_RPC_URL`, `MULETRACE_AUDIT_CONTRACT`, and `MULETRACE_EVM_PRIVATE_KEY` are configured. The admin-only model hash anchor API records the transaction; independent verification checks the receipt, expected chain/block, event digest and contract storage. Audit/model commitments are never reported `verified` until the receipt succeeds, the digest is independently present on-chain, and `MULETRACE_EVM_CONFIRMATIONS` (default 1) has been met. `MULETRACE_EVM_RETRIES` (default 2) retries receipt polling only; it never rebroadcasts a transaction. Pending hashes are retained for later verification.
+Default upload limits are 200 MiB and 250,000 rows. Configure `MULETRACE_MAX_UPLOAD_BYTES` and `MULETRACE_MAX_ROWS` only after considering available memory and disk. Large datasets may need filtering or partitioning; required side-table joins must be prepared in an approved analytical pipeline.
 
-Deploy the registry only after explicitly configuring a testnet RPC, chain ID and deployer key; deployment is guarded against mainnet/local IDs and requires an explicit acknowledgment:
+## Models and interpretation
+
+When a labeled batch has at least 20 usable rows and both classes, the backend can train/evaluate a class-balanced Random Forest using stratified out-of-fold predictions. Unlabeled or insufficient batches are not reported as evaluated. Available metrics can include precision, recall, F1, PR-AUC, ROC-AUC, and a confusion matrix when evaluation is applicable.
+
+Signals may combine model outputs (Random Forest probability or IsolationForest anomaly percentile) with batch-level rules, including robust amount outliers and observed fan-in/fan-out. Explanations provide feature context; they are not causal explanations. Treat every score as a prioritization aid. Only a human decision changes an investigation to `confirmed` or `cleared`.
+
+Each import receives a version ID and a SHA-256 commitment to a canonical run manifest, including source-file hash, mapped schema, feature names, library versions, model configuration, and estimator artifact hash/status. Model artifacts are stored off API/off-chain and are not served by an API route. Configure encrypted host storage and managed key protection before any operational use.
+
+## Audit and optional blockchain
+
+Decision payloads are canonicalized and hashed with SHA-256. Raw transaction/customer evidence and model artifacts remain off-chain. The optional Web3 client can submit an investigation digest or a separately typed model-version digest when the required EVM settings are configured.
+
+**Blockchain is not live by default.** This repository does not include a deployed contract, configured RPC, or wallet. Until a testnet deployment is configured and independently verified, describe the feature as optional/local audit commitments—not as a live on-chain system.
+
+For an intentional testnet deployment, configure the testnet RPC, chain ID, deployer key, and explicit acknowledgment in your environment, then follow the deployment script in `muletrace-contracts/`. Never commit private keys or RPC credentials. After deployment, configure the registry address and authorize the API signer from the registry owner account.
+
+## Configuration and security
+
+Relevant environment settings include:
+
+| Variable | Purpose |
+|---|---|
+| `MULETRACE_BACKEND_URL` | Frontend server-side proxy target (default `http://127.0.0.1:8000`) |
+| `MULETRACE_DB` | SQLite database path |
+| `MULETRACE_API_TOKENS` | Backend bearer-token role mapping; required for production |
+| `MULETRACE_API_TOKEN` | Token injected by the Next.js server proxy when configured |
+| `MULETRACE_FINGERPRINT_SECRET` | Stable secret for cross-source keyed fingerprints; set before imports in production |
+| `MULETRACE_MODEL_DIR` | Model artifact directory |
+| `MULETRACE_MAX_UPLOAD_BYTES` / `MULETRACE_MAX_ROWS` | Upload limits |
+| `MULETRACE_EVM_RPC_URL`, `MULETRACE_AUDIT_CONTRACT`, `MULETRACE_EVM_PRIVATE_KEY` | Optional EVM configuration; keep secrets in a secret manager |
+
+Development mode may allow a local analyst without a token to simplify setup. **Do not expose this mode publicly.** Production requires configured bearer-token role mapping. The prototype does not include password login, user provisioning UI, retention controls, encrypted SQLite-at-rest, or complete production operations hardening. Before real use, add TLS, restrictive CORS, secret management, backups, log redaction, encrypted storage, access reviews, and documented reviewer procedures.
+
+Keep `.env` and local databases/uploads out of Git. Commit a sanitized `.env.example` only if you create one; never put real tokens, keys, customer data, or private datasets in it.
+
+## Tests and validation
+
+Run commands from the repository root unless a `cd` is shown.
 
 ```bash
-export MULETRACE_NETWORK_KIND=testnet
-export MULETRACE_TESTNET_DEPLOY_ACK=I_CONFIRM_TESTNET_DEPLOYMENT
-export MULETRACE_EVM_RPC_URL=...              # testnet RPC
-export MULETRACE_CHAIN_ID=...                 # must match the RPC
-export MULETRACE_EVM_PRIVATE_KEY=...          # secret manager/environment only
-cd muletrace-contracts && npm ci
-npm run deploy:testnet
+# Backend tests
+cd backend
+python3 -m unittest discover -s tests -v
+cd ..
+
+# Frontend checks
+cd frontend
+npm ci
+npm run typecheck
+npm run build
+cd ..
+
+# Smart-contract tests (optional)
+cd muletrace-contracts
+npm ci
+npm test
 ```
 
-Copy the reported registry address and chain ID into the backend environment, authorize the API signer with `setAuthorized(address,true)` from the registry owner, and configure a secret manager. No live deployment or on-chain transaction is performed by the test suite.
+Backend tests use isolated temporary SQLite databases and synthetic fixtures. Contract tests run on a local Hardhat EVM. Passing tests demonstrate tested functionality only; they do not establish fraud-detection accuracy, production readiness, or performance on the external datasets.
 
-## Security status and limitations
+## Known limitations
 
-- API supports bearer-token role mapping via `MULETRACE_API_TOKENS='{"analyst":"...","admin":"..."}'`; production refuses to start without it. Development defaults to an open local analyst to keep the initial local setup usable. Do not expose that mode publicly.
-- The Next.js proxy injects server-side `MULETRACE_API_TOKEN` (never `NEXT_PUBLIC_*`) when configured. Set backend `MULETRACE_API_TOKENS` and proxy token consistently. Use a reverse proxy/TLS, secret manager, restrictive CORS, backups, log redaction and database-at-rest encryption before production.
-- `analyst` and `admin` may decide cases; only `admin` may submit model-version anchor transactions. No dedicated user-management UI, account provisioning workflow, password login, retention policy, encrypted SQLite-at-rest layer, or production ops hardening is included.
-- Validate source licenses, sampling strategy, thresholds, drift, fairness and reviewer procedures before operational use. These scores do not establish fraud. No linked Kaggle dataset was downloaded in this environment, so only synthetic test fixtures were available for functional tests—not business evaluation or dataset-specific claims.
-- No EVM RPC, deployed contract, or wallet was configured for this task. No deployment or live transaction was made. Blockchain views therefore remain truthful about the unconfigured state until a testnet deployment and credentials are supplied.
+- External Kaggle datasets are not included and must be obtained/licensed separately.
+- No real-world business evaluation, calibrated operating threshold, drift study, or fairness assessment is claimed.
+- Cross-source fingerprint matches are potential candidates and can collide; they are not proof that records belong to the same person/entity.
+- The optional EVM integration requires a separately configured testnet deployment and credentials.
+- Production authentication, encrypted-at-rest storage, retention, and operational controls need further implementation.
 
-## Test
+## Project status
 
-```bash
-cd backend && python3 -m unittest discover -s tests -v
-cd .. && npm run typecheck && npm run build
-cd muletrace-contracts && npm test
-```
-
-Backend integration tests use isolated temporary SQLite and synthetic fixtures; they verify functionality only and do not represent production performance. Solidity tests execute on the local Hardhat EVM.
+MuleTrace is intended for demonstration, experimentation, and further development. For a presentation, distinguish implemented local functionality from optional/unconfigured integrations and show the complete import → alert → investigation → decision → audit flow.
