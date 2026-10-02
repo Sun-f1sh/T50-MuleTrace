@@ -14,6 +14,7 @@ const NAV = [
   { href: "/datasets", label: "Datasets" },
   { href: "/intelligence", label: "Cross-source" },
   { href: "/models", label: "Models" },
+  { href: "/admin", label: "Admin" },
 ];
 
 export function AppHeader() {
@@ -22,7 +23,7 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-bg/85 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-8 px-6 lg:px-10">
-        <Logo href="/dashboard" />
+        <Logo href="/" />
         <nav className="flex items-center gap-1 overflow-x-auto">
           {NAV.map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
