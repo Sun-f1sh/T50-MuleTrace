@@ -1,0 +1,16 @@
+"use client";
+import { useAsync } from "@/hooks/useAsync";
+import { getCrossSourceIntelligence } from "@/lib/api";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
+import { formatCompactCurrencyLabel, formatNumber } from "@/lib/utils/format";
+import { Fingerprint, ShieldAlert } from "lucide-react";
+export default function IntelligencePage(){
+ const {data,loading,error,reload}=useAsync(()=>getCrossSourceIntelligence(),[]);
+ return <><PageHeader title="Cross-source intelligence" description="Potential identifier overlaps across independently ingested sources, with source provenance retained and raw IDs hidden."/>
+ {loading?<Skeleton className="h-52 rounded-xl"/>:error?<ErrorState message={error} onRetry={reload}/>:!data||data.candidateCount===0?<EmptyState title="No cross-source identifier candidates" description="Candidates appear only when the same observed account identifier occurs across at least two imported source profiles. No matches are synthesized."/>:<>
+ <section className="mb-4 rounded-xl border border-warn/30 bg-warn-soft p-4"><div className="flex gap-2"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn"/><div><p className="text-sm font-semibold text-ink">Review candidates, do not auto-merge</p><p className="mt-1 text-xs leading-relaxed text-muted">{data.limitation}</p></div></div></section>
+ <section className="mb-4 rounded-xl border border-line bg-surface px-5 py-4"><p className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">Comparison method</p><p className="mt-1 text-sm text-muted">{data.method}</p><p className="mt-2 font-mono text-xs text-ink">{data.candidateCount} candidate identifier{data.candidateCount===1?"":"s"}</p></section>
+ <div className="space-y-3">{data.candidateMatches.map(match=><article key={match.fingerprint} className="rounded-xl border border-line bg-surface p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div className="flex items-center gap-2"><Fingerprint className="h-4 w-4 text-honeyberry"/><span className="font-mono text-sm text-ink">{match.fingerprint}</span></div><span className="rounded-full bg-warn-soft px-2.5 py-1 font-mono text-[10px] uppercase text-warn">candidate · not verified</span></div><div className="mt-4 flex flex-wrap gap-2">{match.sourceDatasetNames.map((name,i)=><span key={match.sourceProfiles[i]} className="rounded-full border border-line px-2.5 py-1 text-xs text-muted">{name}</span>)}</div><div className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-3"><div><p className="font-mono text-[10px] uppercase text-faint">Observed rows</p><p className="mt-1 text-sm font-semibold text-ink">{formatNumber(match.occurrences)}</p></div><div><p className="font-mono text-[10px] uppercase text-faint">Volume</p><p className="mt-1 text-sm font-semibold text-ink">{match.currency==="mixed"?"Multiple currencies":formatCompactCurrencyLabel(match.flaggedVolume,match.currency)}</p></div><div><p className="font-mono text-[10px] uppercase text-faint">Highest score</p><p className="mt-1 text-sm font-semibold text-ink">{match.highestRiskScore}/100</p></div></div><p className="mt-3 text-xs leading-relaxed text-muted">{match.interpretation}</p></article>)}</div></>}
+ </>;
+}

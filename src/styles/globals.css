@@ -1,0 +1,173 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------------------------------------------------------------------------
+   MuleTrace design tokens
+   Palette: Celery #D3E998 · Fluorescent Mint #4DF794 · Honeyberry #3885C0
+            White #FFFFFF · Aurora Black #1F2121
+   Semantic status tones (risk) are deliberately separate from brand accents
+   and are used only for small signals: dots, labels, thin bars.
+--------------------------------------------------------------------------- */
+
+:root {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --subtle: #f6f7f1;
+  --fg: #1f2121;
+  --muted: rgba(31, 33, 33, 0.64);
+  --faint: rgba(31, 33, 33, 0.42);
+  --line: rgba(31, 33, 33, 0.11);
+  --line-strong: rgba(31, 33, 33, 0.24);
+  --on-accent: #1f2121;
+
+  --celery: #d3e998;
+  --mint: #4df794;
+  --honeyberry: #3885c0;
+  --aurora: #1f2121;
+
+  /* Semantic status tones */
+  --tone-danger: #bc3a28;
+  --tone-danger-soft: rgba(188, 58, 40, 0.09);
+  --tone-warn: #96690a;
+  --tone-warn-soft: rgba(150, 105, 10, 0.1);
+  --tone-positive: #17713f;
+  --tone-positive-soft: rgba(23, 113, 63, 0.09);
+  --tone-info: #2b6ea6;
+  --tone-info-soft: rgba(43, 110, 166, 0.09);
+
+  /* Brand accent washes (surfaces / selection) */
+  --celery-wash: rgba(211, 233, 152, 0.4);
+  --mint-wash: rgba(77, 247, 148, 0.14);
+  --honeyberry-wash: rgba(56, 133, 192, 0.1);
+}
+
+.dark {
+  --bg: #1f2121;
+  --surface: #242727;
+  --subtle: #1a1c1c;
+  --fg: #ffffff;
+  --muted: rgba(255, 255, 255, 0.66);
+  --faint: rgba(255, 255, 255, 0.4);
+  --line: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.22);
+  --on-accent: #1f2121;
+
+  --tone-danger: #ff7a63;
+  --tone-danger-soft: rgba(255, 122, 99, 0.1);
+  --tone-warn: #e5b15c;
+  --tone-warn-soft: rgba(229, 177, 92, 0.1);
+  --tone-positive: #4df794;
+  --tone-positive-soft: rgba(77, 247, 148, 0.1);
+  --tone-info: #6aaede;
+  --tone-info-soft: rgba(106, 174, 222, 0.1);
+
+  --celery-wash: rgba(211, 233, 152, 0.12);
+  --mint-wash: rgba(77, 247, 148, 0.12);
+  --honeyberry-wash: rgba(56, 133, 192, 0.16);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-subtle: var(--subtle);
+  --color-ink: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-on-accent: var(--on-accent);
+
+  --color-celery: var(--celery);
+  --color-mint: var(--mint);
+  --color-honeyberry: var(--honeyberry);
+  --color-aurora: var(--aurora);
+
+  --color-danger: var(--tone-danger);
+  --color-danger-soft: var(--tone-danger-soft);
+  --color-warn: var(--tone-warn);
+  --color-warn-soft: var(--tone-warn-soft);
+  --color-positive: var(--tone-positive);
+  --color-positive-soft: var(--tone-positive-soft);
+  --color-info: var(--tone-info);
+  --color-info-soft: var(--tone-info-soft);
+
+  --color-celery-wash: var(--celery-wash);
+  --color-mint-wash: var(--mint-wash);
+  --color-honeyberry-wash: var(--honeyberry-wash);
+
+  --font-sans: var(--font-urbanist), "Urbanist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", monospace;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background: var(--celery);
+    color: var(--aurora);
+  }
+
+  * {
+    border-color: var(--line);
+  }
+
+  /* Thin, quiet scrollbars */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--line-strong);
+    border-radius: 8px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer utilities {
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+  .display-tight {
+    letter-spacing: -0.045em;
+    line-height: 0.94;
+  }
+}
+
+/* React Flow — keep the graph quiet and aligned with the design system */
+.react-flow__attribution {
+  display: none;
+}
+.react-flow__handle {
+  opacity: 0;
+  pointer-events: none;
+}
+.react-flow__edge-path {
+  transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease;
+}
+.react-flow__controls-button {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--fg);
+  fill: var(--fg);
+}
+.react-flow__controls-button:hover {
+  background: var(--subtle);
+}
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
