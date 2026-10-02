@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: path.resolve(),
   webpack(config) {
-    config.resolve.alias["@shared"] = path.resolve(__dirname, "../shared");
+    config.resolve.alias["@shared"] = path.resolve(__dirname, "./shared");
     return config;
   },
 };
